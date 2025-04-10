@@ -1,1 +1,2 @@
-# brigiht
+# linux bright setup
+cli
