@@ -1,47 +1,39 @@
+use calibright::{CalibrightBuilder, CalibrightConfig, DeviceConfig};
 use std::io::{self, Write};
-use std::process::Command;
+use anyhow::Result;
 
-fn main() {
-    // 提示用户输入亮度百分比
-    print!("请输入亮度百分比 (0-100): ");
-    io::stdout().flush().unwrap();
+#[tokio::main]
+async fn main() -> Result<()> {
+    // 构建 Calibright 配置
+    let calibright_config = CalibrightConfig::new_with_defaults(&DeviceConfig::default()).await?;
+    let mut calibright = CalibrightBuilder::new()
+        .with_device_regex(".") // 默认匹配所有 backlight 设备
+        .with_config(calibright_config)
+        .build()
+        .await?;
+
+    // 读取当前亮度
+    let current = calibright.get_brightness().await?;
+    println!("当前亮度: {:.0}%", current * 100.0);
+
+    // 提示用户输入新的亮度值
+    print!("请输入新的亮度百分比 (0 - 100): ");
+    io::stdout().flush()?;
 
     let mut input = String::new();
-    io::stdin().read_line(&mut input).unwrap();
-
-    let percent: u8 = match input.trim().parse() {
-        Ok(val) if val <= 100 => val,
+    io::stdin().read_line(&mut input)?;
+    let percent: f64 = match input.trim().parse() {
+        Ok(v) if v >= 0.0 && v <= 100.0 => v,
         _ => {
-            eprintln!("输入无效，请输入 0 到 100 之间的数字！");
-            return;
+            eprintln!("⚠️ 输入无效，请输入 0 到 100 之间的数字。");
+            return Ok(());
         }
     };
 
-    let brightness = (percent as f32) / 100.0;
+    let value = percent / 100.0;
+    calibright.set_brightness(value).await?;
+    println!("✔️ 亮度已设置为 {:.0}%", percent);
 
-    // 获取当前连接的显示器名
-    let output = Command::new("xrandr")
-        .arg("--current")
-        .output()
-        .expect("无法运行 xrandr");
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let display_line = stdout.lines()
-        .find(|line| line.contains(" connected"))
-        .expect("未检测到连接的显示器");
-
-    let display_name = display_line.split_whitespace().next().unwrap();
-
-    // 设置亮度
-    let status = Command::new("xrandr")
-        .args(["--output", display_name, "--brightness", &brightness.to_string()])
-        .status()
-        .expect("无法设置亮度");
-
-    if status.success() {
-        println!("亮度已设置为 {}%", percent);
-    } else {
-        eprintln!("设置亮度失败，请确保安装了 xrandr 并在图形环境下运行");
-    }
+    Ok(())
 }
 
