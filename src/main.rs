@@ -4,20 +4,20 @@ use anyhow::Result;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // 构建 Calibright 配置
+    // Set up Calibright configuration with default device settings
     let calibright_config = CalibrightConfig::new_with_defaults(&DeviceConfig::default()).await?;
     let mut calibright = CalibrightBuilder::new()
-        .with_device_regex(".") // 默认匹配所有 backlight 设备
+        .with_device_regex(".") // Match all backlight devices by default
         .with_config(calibright_config)
         .build()
         .await?;
 
-    // 读取当前亮度
+    // Get current brightness level
     let current = calibright.get_brightness().await?;
-    println!("当前亮度: {:.0}%", current * 100.0);
+    println!("Current brightness: {:.0}%", current * 100.0);
 
-    // 提示用户输入新的亮度值
-    print!("请输入新的亮度百分比 (0 - 100): ");
+    // Ask user for new brightness value
+    print!("Enter new brightness percentage (0-100): ");
     io::stdout().flush()?;
 
     let mut input = String::new();
@@ -25,15 +25,14 @@ async fn main() -> Result<()> {
     let percent: f64 = match input.trim().parse() {
         Ok(v) if v >= 0.0 && v <= 100.0 => v,
         _ => {
-            eprintln!("⚠️ 输入无效，请输入 0 到 100 之间的数字。");
+            eprintln!("⚠️ Invalid input. Please enter a number between 0 and 100.");
             return Ok(());
         }
     };
 
     let value = percent / 100.0;
     calibright.set_brightness(value).await?;
-    println!("✔️ 亮度已设置为 {:.0}%", percent);
+    println!("✔️ Brightness set to {:.0}%", percent);
 
     Ok(())
 }
-
